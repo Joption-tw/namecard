@@ -1,287 +1,553 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>選擇權百科 - 實戰內容整合版</title>
-    <!-- Tailwind CSS CDN -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>數位名片管理系統 v2.0.5</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- React & ReactDOM CDN -->
+    <!-- React & Babel -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- Babel for JSX Compilation -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
-        body { font-family: 'Noto Sans TC', sans-serif; }
-        .animate-fade-in { animation: fadeIn 0.4s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .submenu-enter { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
-        .submenu-open { max-height: 800px; }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        :root {
+            --safe-area-inset-bottom: env(safe-area-inset-bottom);
+        }
+        
+        body {
+            overscroll-behavior-y: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .card-image-container {
+            aspect-ratio: 1.58 / 1;
+            background-color: #f8fafc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border-radius: 1rem;
+        }
+        
+        .card-image-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        @keyframes mobileSlideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+        
+        @media (max-width: 640px) {
+            .mobile-bottom-sheet {
+                animation: mobileSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+                border-radius: 1.5rem 1.5rem 0 0;
+            }
+        }
+
+        .touch-active:active {
+            transform: scale(0.96);
+            opacity: 0.9;
+        }
+        
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .full-h-dynamic {
+            height: 100dvh;
+        }
+
+        .debug-log {
+            font-family: monospace;
+            font-size: 10px;
+            background: #0f172a;
+            color: #22d3ee;
+            padding: 8px;
+            border-radius: 8px;
+            max-height: 80px;
+            overflow-y: auto;
+            line-height: 1.4;
+        }
     </style>
 </head>
-<body class="bg-gray-50">
+<body class="bg-slate-50 font-sans text-slate-900">
     <div id="root"></div>
 
-    <script type="text/babel">
-        const { useState } = React;
+    <script type="text/babel" data-type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken, setPersistence, inMemoryPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const Icons = {
-            Home: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>,
-            Book: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>,
-            Target: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>,
-            TrendingUp: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>,
-            Shield: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>,
-            Zap: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>,
-            Clock: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>,
-            ChevronDown: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>,
-            ChevronRight: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>,
-            Menu: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>,
-            X: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        // --- 版本號 ---
+        const APP_VERSION = "v2.0.5";
+
+        // --- Firebase 初始化 ---
+        const firebaseConfig = typeof __firebase_config !== 'undefined' 
+            ? JSON.parse(__firebase_config) 
+            : {
+                apiKey: "AIzaSyCmqmGIBfUv_UVJU80AB_iUpE_yLLX-dAw",
+                authDomain: "mistake-notebook-caca8.firebaseapp.com",
+                projectId: "mistake-notebook-caca8",
+                storageBucket: "mistake-notebook-caca8.firebasestorage.app",
+                messagingSenderId: "298098777699",
+                appId: "1:298098777699:web:4590aecebc2293bab9e256",
+                measurementId: "G-6S5QWYKT7M"
+            };
+        
+        const appId = typeof __app_id !== 'undefined' ? __app_id : "business-card-app";
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        const Icon = ({ name, size = 20, className = "" }) => {
+            const containerRef = useRef(null);
+            useEffect(() => {
+                if (containerRef.current) {
+                    containerRef.current.innerHTML = '';
+                    const icon = lucide.icons[name];
+                    if (icon) {
+                        const iconSvg = lucide.createElement(icon);
+                        iconSvg.setAttribute('width', size);
+                        iconSvg.setAttribute('height', size);
+                        iconSvg.setAttribute('class', className);
+                        containerRef.current.appendChild(iconSvg);
+                    }
+                }
+            }, [name, size, className]);
+            return <span ref={containerRef} className="inline-flex items-center justify-center shrink-0" />;
         };
 
-        const App = () => {
-            const [activeChapterId, setActiveChapterId] = useState('home');
-            const [activeSubIndex, setActiveSubIndex] = useState(null);
-            const [isMenuOpen, setIsMenuOpen] = useState(true);
+        function App() {
+            const [user, setUser] = useState(null);
+            const [cards, setCards] = useState([]);
+            const [searchTerm, setSearchTerm] = useState('');
+            const [isAdding, setIsAdding] = useState(false);
+            const [editTarget, setEditTarget] = useState(null); // 用於儲存正在編輯的名片
+            const [deleteTarget, setDeleteTarget] = useState(null);
+            const [loading, setLoading] = useState(false);
+            const [isConnecting, setIsConnecting] = useState(true);
+            const [selectedImage, setSelectedImage] = useState(null);
+            const [debugLogs, setDebugLogs] = useState([]);
+            const [newCard, setNewCard] = useState({
+                name: '', title: '', company: '', phone: '', email: ''
+            });
 
-            // --- 連結設定區：請在這裡修改您的 HTML 檔案路徑 ---
-            const chapters = [
-                {
-                    id: 'ch1',
-                    title: '第一章：選擇權邏輯入門',
-                    icon: <Icons.Book />,
-                    subpages: [
-                        { title: '什麼是選擇權？', url: './1-1.html' },
-                        { title: '權利與義務的對稱性', url: './1-2.html' },
-                        { title: '買方與賣方的獲利概率', url: './1-3.html' }
-                    ]
-                },
-                {
-                    id: 'ch2',
-                    title: '第二章：核心名詞大解析',
-                    icon: <Icons.Target />,
-                    subpages: [
-                        { title: '履約價與權利金', url: './2-1.html' },
-                        { title: '價內、價平與價外', url: './2-2.html' },
-                        { title: '結算機制與到期效應', url: './2-3.html' }
-                    ]
-                },
-                {
-                    id: 'ch3',
-                    title: '第三章：權利金的秘密',
-                    icon: <Icons.Zap />,
-                    subpages: [
-                        { title: '內涵價值 vs 時間價值', url: './3-1.html' },
-                        { title: '時間價值的流逝規律', url: './3-2.html' }
-                    ]
-                },
-                {
-                    id: 'ch4',
-                    title: '第四章：希臘字母實戰力',
-                    icon: <Icons.TrendingUp />,
-                    subpages: [
-                        { title: 'Delta：方向敏感度', url: './4-1.html' },
-                        { title: 'Theta：時間衰減', url: './4-2.html' }
-                    ]
-                },
-                {
-                    id: 'ch5',
-                    title: '第五章：買方策略',
-                    icon: <Icons.Zap />,
-                    subpages: [
-                        { title: '買入買權 (Long Call)', url: './5-1.html' },
-                        { title: '買入賣權 (Long Put)', url: './5-2.html' }
-                    ]
-                },
-                {
-                    id: 'ch6',
-                    title: '第六章：賣方策略',
-                    icon: <Icons.Shield />,
-                    subpages: [
-                        { title: '賣出買權 (Short Call)', url: './6-1.html' },
-                        { title: '賣出賣權 (Short Put)', url: './6-2.html' }
-                    ]
-                },
-                {
-                    id: 'ch7',
-                    title: '第七章：價差組合 (Spreads)',
-                    icon: <Icons.Target />,
-                    subpages: [
-                        { title: '垂直價差策略', url: './7-1.html' },
-                        { title: '鐵蝴蝶與對稱策略', url: './7-2.html' }
-                    ]
-                },
-                {
-                    id: 'ch8',
-                    title: '第八章：存股族與選擇權',
-                    icon: <Icons.Clock />,
-                    subpages: [
-                        { title: 'Covered Call 加薪術', url: './8-1.html' },
-                        { title: 'Cash Secured Put', url: './8-2.html' }
-                    ]
-                },
-                {
-                    id: 'ch9',
-                    title: '第九章：波動率交易',
-                    icon: <Icons.TrendingUp />,
-                    subpages: [
-                        { title: 'IV Crush 的威力', url: './9-1.html' },
-                        { title: '跨式與勒式組合', url: './9-2.html' }
-                    ]
-                },
-                {
-                    id: 'ch10',
-                    title: '第十章：風控與交易系統',
-                    icon: <Icons.Shield />,
-                    subpages: [
-                        { title: '部位管理技巧', url: './10-1.html' },
-                        { title: '動態救火與轉倉', url: './10-2.html' }
-                    ]
+            const addLog = (msg) => {
+                setDebugLogs(prev => [...prev.slice(-10), `[${new Date().toLocaleTimeString()}] ${msg}`]);
+            };
+
+            // 1. 身份驗證邏輯
+            useEffect(() => {
+                const initAuth = async () => {
+                    addLog("正在嘗試身份驗證...");
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (e) {
+                        addLog(`驗證失敗，嘗試備用模式: ${e.code}`);
+                        try {
+                            await setPersistence(auth, inMemoryPersistence);
+                            await signInAnonymously(auth);
+                        } catch (fallbackErr) {
+                            addLog("所有登入嘗試皆失敗。");
+                        }
+                    }
+                };
+                initAuth();
+
+                const unsubscribe = onAuthStateChanged(auth, (u) => {
+                    if (u) {
+                        addLog("驗證成功");
+                        setUser(u);
+                        setIsConnecting(false);
+                    } else {
+                        setUser(null);
+                    }
+                });
+                return () => unsubscribe();
+            }, []);
+
+            // 2. 實時資料讀取
+            useEffect(() => {
+                if (!user) return;
+                
+                addLog("正在連接資料庫...");
+                const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'cards');
+                
+                const unsubscribe = onSnapshot(colRef, 
+                    (snapshot) => {
+                        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        setCards(data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+                    },
+                    (error) => {
+                        addLog(`權限或讀取錯誤: ${error.code}`);
+                        console.error("Firestore Error:", error);
+                    }
+                );
+                return () => unsubscribe();
+            }, [user]);
+
+            const compressImage = (file) => {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(file);
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.src = e.target.result;
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const MAX_WIDTH = 800;
+                            let width = img.width;
+                            let height = img.height;
+                            if (width > MAX_WIDTH) {
+                                height *= MAX_WIDTH / width;
+                                width = MAX_WIDTH;
+                            }
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, width, height);
+                            resolve(canvas.toDataURL('image/jpeg', 0.7));
+                        };
+                    };
+                });
+            };
+
+            const handleFileChange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                setLoading(true);
+                const compressed = await compressImage(file);
+                setSelectedImage(compressed);
+                setLoading(false);
+            };
+
+            const saveCard = async () => {
+                if (!user || !newCard.name) return;
+                setLoading(true);
+                try {
+                    const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'cards');
+                    await addDoc(colRef, {
+                        ...newCard,
+                        imageUrl: selectedImage,
+                        createdAt: new Date().toISOString(),
+                        uid: user.uid
+                    });
+                    setIsAdding(false);
+                    setNewCard({ name: '', title: '', company: '', phone: '', email: '' });
+                    setSelectedImage(null);
+                } catch (e) {
+                    addLog(`儲存失敗: ${e.code}`);
+                } finally {
+                    setLoading(false);
                 }
-            ];
+            };
 
-            const currentChapter = chapters.find(c => c.id === activeChapterId);
+            // 更新名片文字資料
+            const handleUpdateCard = async () => {
+                if (!user || !editTarget || !editTarget.name) return;
+                setLoading(true);
+                try {
+                    const cardDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'cards', editTarget.id);
+                    await updateDoc(cardDocRef, {
+                        name: editTarget.name,
+                        title: editTarget.title,
+                        company: editTarget.company,
+                        phone: editTarget.phone,
+                        email: editTarget.email,
+                        updatedAt: new Date().toISOString()
+                    });
+                    setEditTarget(null);
+                } catch (e) {
+                    addLog(`更新失敗: ${e.code}`);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const filteredCards = useMemo(() => {
+                return cards.filter(c => 
+                    (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                    (c.company || '').toLowerCase().includes(searchTerm.toLowerCase())
+                );
+            }, [cards, searchTerm]);
+
+            if (isConnecting) {
+                return (
+                    <div className="flex flex-col items-center justify-center full-h-dynamic bg-white p-6 text-center">
+                        <Icon name="Loader2" className="animate-spin text-indigo-600 mb-4" size={48} />
+                        <p className="text-slate-400 font-bold tracking-widest text-xs uppercase">雲端驗證中... ({APP_VERSION})</p>
+                        <div className="mt-8 w-full max-w-xs debug-log text-left">
+                            {debugLogs.map((l, i) => <div key={i}>{l}</div>)}
+                        </div>
+                    </div>
+                );
+            }
 
             return (
-                <div className="min-h-screen flex flex-col md:flex-row bg-gray-50 text-gray-900">
-                    {/* Sidebar */}
-                    <aside className={`fixed inset-y-0 left-0 z-50 w-80 bg-white border-r border-gray-100 transform transition-transform duration-300 ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0`}>
-                        <div className="h-full flex flex-col">
-                            {/* Logo / Header */}
-                            <div className="p-8 pb-4 flex items-center gap-3 cursor-pointer" onClick={() => {setActiveChapterId('home'); setActiveSubIndex(null);}}>
-                                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white text-2xl font-bold shadow-lg">Ω</div>
-                                <h2 className="text-xl font-black tracking-tighter">選擇權百科</h2>
+                <div className="full-h-dynamic flex flex-col max-w-4xl mx-auto bg-slate-50">
+                    {/* Header */}
+                    <header className="p-5 pb-2 flex justify-between items-center bg-slate-50/80 backdrop-blur-md sticky top-0 z-30">
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h1 className="text-2xl font-black text-slate-800 tracking-tighter">名片管理</h1>
+                                <span className="bg-indigo-100 text-indigo-600 text-[10px] font-bold px-2 py-0.5 rounded-full">{APP_VERSION}</span>
                             </div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">已安全連線</span>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={() => setIsAdding(true)}
+                            className="touch-active bg-indigo-600 text-white p-3 rounded-2xl shadow-lg shadow-indigo-200"
+                        >
+                            <Icon name="Plus" size={24} />
+                        </button>
+                    </header>
 
-                            {/* Navigation */}
-                            <nav className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
-                                <button 
-                                    onClick={() => {setActiveChapterId('home'); setActiveSubIndex(null);}}
-                                    className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeChapterId === 'home' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
-                                >
-                                    <Icons.Home /> 網站首頁
-                                </button>
-                                
-                                <div className="pt-4 pb-2 text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">課程大綱 (10章)</div>
+                    {/* Search */}
+                    <div className="px-5 py-3">
+                        <div className="relative">
+                            <Icon name="Search" className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <input 
+                                type="text"
+                                placeholder="搜尋姓名、公司..."
+                                className="w-full bg-white border-none rounded-2xl py-3.5 pl-12 pr-4 shadow-sm focus:ring-2 focus:ring-indigo-500 transition-all text-base"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                    </div>
 
-                                {chapters.map((ch, idx) => (
-                                    <div key={ch.id} className="space-y-1">
-                                        <button 
-                                            onClick={() => {setActiveChapterId(ch.id); setActiveSubIndex(null);}}
-                                            className={`w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all border ${activeChapterId === ch.id ? 'bg-blue-50 border-blue-100 text-blue-700' : 'bg-transparent border-transparent text-gray-600 hover:bg-gray-50'}`}
-                                        >
-                                            <div className="flex items-center gap-3 truncate">
-                                                <span className={`shrink-0 ${activeChapterId === ch.id ? 'text-blue-600' : 'text-gray-400'}`}>{ch.icon}</span>
-                                                <div className="flex flex-col items-start leading-tight truncate">
-                                                    <span className="text-[10px] font-bold uppercase opacity-60">第 {idx + 1} 章</span>
-                                                    <span className="font-black text-sm truncate">{ch.title.split('：')[1]}</span>
-                                                </div>
+                    {/* Card List */}
+                    <main className="flex-1 overflow-y-auto px-5 pb-10 hide-scrollbar">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {filteredCards.map(card => (
+                                <div key={card.id} className="bg-white rounded-[2rem] p-4 shadow-sm border border-slate-100 relative overflow-hidden">
+                                    <div className="card-image-container mb-4">
+                                        {card.imageUrl ? (
+                                            <img src={card.imageUrl} alt="Card" />
+                                        ) : (
+                                            <Icon name="Image" size={32} className="text-slate-200" />
+                                        )}
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="flex justify-between items-start">
+                                            <h3 className="font-bold text-lg text-slate-800 truncate">{card.name}</h3>
+                                            <div className="flex items-center gap-2">
+                                                <button 
+                                                    onClick={() => setEditTarget(card)}
+                                                    className="text-slate-300 hover:text-indigo-500 p-1"
+                                                >
+                                                    <Icon name="Pencil" size={18} />
+                                                </button>
+                                                <button 
+                                                    onClick={() => setDeleteTarget(card)}
+                                                    className="text-slate-300 hover:text-red-500 p-1"
+                                                >
+                                                    <Icon name="Trash2" size={18} />
+                                                </button>
                                             </div>
-                                            <div className={`transition-transform shrink-0 ${activeChapterId === ch.id ? 'rotate-180 text-blue-600' : 'text-gray-300'}`}>
-                                                <Icons.ChevronDown />
+                                        </div>
+                                        <p className="text-indigo-600 text-xs font-black uppercase tracking-wider">{card.title || '無職稱'}</p>
+                                        <div className="pt-2 space-y-1.5">
+                                            <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                                                <Icon name="Building" size={14} className="text-slate-400 shrink-0" />
+                                                <span className="truncate">{card.company || '-'}</span>
                                             </div>
-                                        </button>
-
-                                        {/* Subpages (Accordion) */}
-                                        <div className={`submenu-enter ${activeChapterId === ch.id ? 'submenu-open' : ''}`}>
-                                            <div className="pl-11 pr-2 py-1 space-y-1">
-                                                {ch.subpages.map((sub, sIdx) => (
-                                                    <button
-                                                        key={sIdx}
-                                                        onClick={() => {setActiveSubIndex(sIdx); if(window.innerWidth < 768) setIsMenuOpen(false);}}
-                                                        className={`w-full text-left py-2.5 px-3 rounded-lg text-xs font-bold transition-all ${activeChapterId === ch.id && activeSubIndex === sIdx ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-blue-600 hover:bg-blue-50'}`}
-                                                    >
-                                                        {sub.title}
-                                                    </button>
-                                                ))}
+                                            <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                                                <Icon name="Phone" size={14} className="text-slate-400 shrink-0" />
+                                                <span>{card.phone || '-'}</span>
                                             </div>
                                         </div>
                                     </div>
-                                ))}
-                            </nav>
+                                </div>
+                            ))}
                         </div>
-                    </aside>
-
-                    {/* Main Content Area */}
-                    <main className="flex-1 h-screen overflow-y-auto flex flex-col relative">
-                        {/* Mobile Header */}
-                        <header className="md:hidden flex items-center justify-between p-4 bg-white border-b sticky top-0 z-40 w-full shadow-sm">
-                            <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">Ω</div>
-                                <span className="font-black text-gray-800 tracking-tighter">教學百科</span>
+                        
+                        {filteredCards.length === 0 && (
+                            <div className="flex flex-col items-center justify-center py-20 opacity-20">
+                                <Icon name="Inbox" size={64} />
+                                <p className="font-bold mt-4">尚無名片資料</p>
                             </div>
-                            <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg">
-                                {isMenuOpen ? <Icons.X /> : <Icons.Menu />}
-                            </button>
-                        </header>
+                        )}
+                    </main>
 
-                        <div className="p-4 md:p-10 lg:p-12 flex-1 flex flex-col">
-                            {activeChapterId === 'home' ? (
-                                <div className="animate-fade-in bg-gradient-to-br from-indigo-700 to-blue-900 text-white p-12 rounded-3xl shadow-2xl">
-                                    <h1 className="text-4xl md:text-5xl font-black mb-6 text-white leading-tight">掌握選擇權：<br/>獲利與風險的平衡藝術</h1>
-                                    <p className="text-lg opacity-80 max-w-2xl mb-10">
-                                        這是一套完整的交易地圖。從第一章開始，我們將一步步揭開衍生性商品的神秘面紗，建立穩健的交易體系。
-                                    </p>
-                                    <button onClick={() => setActiveChapterId('ch1')} className="bg-white text-blue-900 px-8 py-3 rounded-full font-bold shadow-lg hover:bg-blue-50 transition-all flex items-center gap-2">
-                                        開始第一章學習 <Icons.ChevronRight />
+                    {/* 新增名片 Modal */}
+                    {isAdding && (
+                        <div className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center sm:items-center bg-slate-900/60 backdrop-blur-sm">
+                            <div className="absolute inset-0" onClick={() => setIsAdding(false)}></div>
+                            <div className="mobile-bottom-sheet bg-white w-full sm:max-w-xl sm:rounded-[2.5rem] max-h-[92dvh] overflow-hidden flex flex-col relative">
+                                <div className="p-6 border-b border-slate-50 flex justify-between items-center shrink-0">
+                                    <h2 className="text-xl font-black">新增名片</h2>
+                                    <button onClick={() => setIsAdding(false)} className="p-2 bg-slate-100 rounded-full text-slate-500">
+                                        <Icon name="X" size={20} />
                                     </button>
                                 </div>
-                            ) : (
-                                <div className="animate-fade-in flex-1 flex flex-col">
-                                    <div className="bg-white rounded-3xl shadow-xl border border-gray-100 flex-1 flex flex-col overflow-hidden">
-                                        {activeSubIndex === null ? (
-                                            <div className="p-12 text-center py-24">
-                                                <h2 className="text-3xl font-black mb-4 text-blue-900">{currentChapter.title}</h2>
-                                                <p className="text-gray-400 mb-8 italic text-sm font-medium">請從左側導覽列選擇具體課目開始閱讀內容</p>
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto text-left">
-                                                    {currentChapter.subpages.map((sub, i) => (
-                                                        <button key={i} onClick={() => setActiveSubIndex(i)} className="p-4 rounded-xl border border-gray-100 hover:border-blue-500 hover:bg-blue-50 transition-all font-bold text-gray-700 flex justify-between items-center group">
-                                                            {sub.title}
-                                                            <Icons.ChevronRight />
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
+                                
+                                <div className="flex-1 overflow-y-auto p-6 space-y-6 hide-scrollbar">
+                                    <div className="relative card-image-container border-2 border-dashed border-slate-200 bg-slate-50 cursor-pointer overflow-hidden active:bg-slate-100 transition-colors">
+                                        {selectedImage ? (
+                                            <img src={selectedImage} />
                                         ) : (
-                                            <div className="flex-1 flex flex-col min-h-0">
-                                                {/* Iframe Section */}
-                                                <div className="p-4 bg-gray-50 border-b flex justify-between items-center shrink-0">
-                                                    <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{currentChapter.title}</span>
-                                                    <h3 className="text-sm font-black text-gray-800">{currentChapter.subpages[activeSubIndex].title}</h3>
-                                                </div>
-                                                <div className="flex-1 bg-white relative">
-                                                    {currentChapter.subpages[activeSubIndex].url ? (
-                                                        <iframe 
-                                                            src={currentChapter.subpages[activeSubIndex].url} 
-                                                            className="w-full h-full border-none"
-                                                            title="Lesson Content"
-                                                        ></iframe>
-                                                    ) : (
-                                                        <div className="p-12 text-center text-gray-300 italic">尚未設定該章節的連結路徑</div>
-                                                    )}
-                                                </div>
+                                            <div className="flex flex-col items-center gap-2 text-slate-400">
+                                                <Icon name="Camera" size={40} />
+                                                <p className="text-xs font-bold uppercase tracking-widest">拍名片或選取檔案</p>
+                                            </div>
+                                        )}
+                                        <input 
+                                            type="file" 
+                                            accept="image/*"
+                                            className="absolute inset-0 opacity-0 cursor-pointer"
+                                            onChange={handleFileChange}
+                                        />
+                                        {loading && (
+                                            <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                                                <Icon name="Loader2" className="animate-spin text-indigo-600" size={32} />
                                             </div>
                                         )}
                                     </div>
-                                </div>
-                            )}
-                            
-                            <footer className="mt-12 text-center text-gray-400 text-[10px] uppercase font-bold tracking-widest">
-                                © 2024 選擇權實戰百科 | 專業寫作與交易架構
-                            </footer>
-                        </div>
-                    </main>
 
-                    {/* Backdrop for mobile navigation */}
-                    {isMenuOpen && window.innerWidth < 768 && (
-                        <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={() => setIsMenuOpen(false)}></div>
+                                    <div className="space-y-4 pb-10">
+                                        {[
+                                            { label: '姓名 (必填)', key: 'name' },
+                                            { label: '職稱', key: 'title' },
+                                            { label: '公司', key: 'company' },
+                                            { label: '電話', key: 'phone' },
+                                            { label: 'Email', key: 'email' }
+                                        ].map(field => (
+                                            <div key={field.key}>
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">
+                                                    {field.label}
+                                                </label>
+                                                <input 
+                                                    type="text"
+                                                    value={newCard[field.key]}
+                                                    onChange={e => setNewCard({...newCard, [field.key]: e.target.value})}
+                                                    className="w-full bg-slate-50 border-none rounded-2xl p-4 text-base font-bold focus:ring-2 focus:ring-indigo-500 transition-all shadow-inner"
+                                                    placeholder={`輸入${field.label.split(' ')[0]}`}
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="p-6 pt-2 border-t border-slate-50 shrink-0 mb-safe">
+                                    <button 
+                                        disabled={!newCard.name || loading}
+                                        onClick={saveCard}
+                                        className="touch-active w-full bg-indigo-600 text-white py-4 rounded-[1.5rem] font-black shadow-xl shadow-indigo-100 disabled:opacity-30 disabled:shadow-none flex items-center justify-center gap-2"
+                                    >
+                                        {loading ? <Icon name="Loader2" className="animate-spin" size={20} /> : <Icon name="CheckCircle" size={20} />}
+                                        確認儲存
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 修改名片 Modal */}
+                    {editTarget && (
+                        <div className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center sm:items-center bg-slate-900/60 backdrop-blur-sm">
+                            <div className="absolute inset-0" onClick={() => setEditTarget(null)}></div>
+                            <div className="mobile-bottom-sheet bg-white w-full sm:max-w-xl sm:rounded-[2.5rem] max-h-[92dvh] overflow-hidden flex flex-col relative shadow-2xl">
+                                <div className="p-6 border-b border-slate-50 flex justify-between items-center shrink-0">
+                                    <h2 className="text-xl font-black">修改資訊</h2>
+                                    <button onClick={() => setEditTarget(null)} className="p-2 bg-slate-100 rounded-full text-slate-500">
+                                        <Icon name="X" size={20} />
+                                    </button>
+                                </div>
+                                
+                                <div className="flex-1 overflow-y-auto p-6 space-y-6 hide-scrollbar">
+                                    {/* 預覽目前的圖片 (不支援修改圖片以保持穩定性) */}
+                                    <div className="card-image-container border-2 border-slate-100 bg-slate-50 grayscale-[0.5] opacity-80">
+                                        {editTarget.imageUrl ? (
+                                            <img src={editTarget.imageUrl} alt="Current Card" />
+                                        ) : (
+                                            <Icon name="Image" size={32} className="text-slate-200" />
+                                        )}
+                                    </div>
+
+                                    <div className="space-y-4 pb-10">
+                                        {[
+                                            { label: '姓名 (必填)', key: 'name' },
+                                            { label: '職稱', key: 'title' },
+                                            { label: '公司', key: 'company' },
+                                            { label: '電話', key: 'phone' },
+                                            { label: 'Email', key: 'email' }
+                                        ].map(field => (
+                                            <div key={field.key}>
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">
+                                                    {field.label}
+                                                </label>
+                                                <input 
+                                                    type="text"
+                                                    value={editTarget[field.key] || ''}
+                                                    onChange={e => setEditTarget({...editTarget, [field.key]: e.target.value})}
+                                                    className="w-full bg-slate-50 border-none rounded-2xl p-4 text-base font-bold focus:ring-2 focus:ring-indigo-500 transition-all shadow-inner"
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="p-6 pt-2 border-t border-slate-50 shrink-0 mb-safe">
+                                    <button 
+                                        disabled={!editTarget.name || loading}
+                                        onClick={handleUpdateCard}
+                                        className="touch-active w-full bg-indigo-600 text-white py-4 rounded-[1.5rem] font-black shadow-xl shadow-indigo-100 disabled:opacity-30 disabled:shadow-none flex items-center justify-center gap-2"
+                                    >
+                                        {loading ? <Icon name="Loader2" className="animate-spin" size={20} /> : <Icon name="Save" size={20} />}
+                                        儲存修改
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 刪除確認 Modal */}
+                    {deleteTarget && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
+                            <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-xs text-center shadow-2xl">
+                                <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <Icon name="Trash2" size={32} />
+                                </div>
+                                <h3 className="text-xl font-black mb-2">確定刪除？</h3>
+                                <p className="text-sm text-slate-500 mb-8 leading-relaxed">「{deleteTarget.name}」的資料將從雲端庫移除。</p>
+                                <div className="space-y-3">
+                                    <button 
+                                        onClick={async () => {
+                                            try {
+                                                const cardDoc = doc(db, 'artifacts', appId, 'public', 'data', 'cards', deleteTarget.id);
+                                                await deleteDoc(cardDoc);
+                                                setDeleteTarget(null);
+                                            } catch (e) {
+                                                addLog(`刪除失敗: ${e.code}`);
+                                            }
+                                        }}
+                                        className="touch-active w-full bg-red-500 text-white py-4 rounded-2xl font-black shadow-lg shadow-red-100"
+                                    >
+                                        確定刪除
+                                    </button>
+                                    <button onClick={() => setDeleteTarget(null)} className="w-full text-slate-400 font-bold py-2 hover:text-slate-600 transition-colors">取消</button>
+                                </div>
+                            </div>
+                        </div>
                     )}
                 </div>
             );
-        };
+        }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
