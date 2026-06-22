@@ -6,17 +6,17 @@
     <title>數位名片管理系統 v2.0.5</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- React & Babel -->
+    <!-- React & htm -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/htm@3/dist/htm.js"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         :root {
             --safe-area-inset-bottom: env(safe-area-inset-bottom);
         }
-        
+
         body {
             overscroll-behavior-y: none;
             -webkit-tap-highlight-color: transparent;
@@ -31,7 +31,7 @@
             overflow: hidden;
             border-radius: 1rem;
         }
-        
+
         .card-image-container img {
             width: 100%;
             height: 100%;
@@ -42,7 +42,7 @@
             from { transform: translateY(100%); }
             to { transform: translateY(0); }
         }
-        
+
         @media (max-width: 640px) {
             .mobile-bottom-sheet {
                 animation: mobileSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
@@ -54,10 +54,10 @@
             transform: scale(0.96);
             opacity: 0.9;
         }
-        
+
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        
+
         .full-h-dynamic {
             height: 100dvh;
         }
@@ -78,19 +78,13 @@
 <body class="bg-slate-50 font-sans text-slate-900">
     <div id="root"></div>
 
-    <script type="text/babel" data-type="module">
+    <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken, setPersistence, inMemoryPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const { useState, useEffect, useRef, useMemo } = React;
-
-        // --- 版本號 ---
-        const APP_VERSION = "v2.0.5";
-
-        // --- Firebase 初始化 ---
-        const firebaseConfig = typeof __firebase_config !== 'undefined' 
-            ? JSON.parse(__firebase_config) 
+        const firebaseConfig = typeof __firebase_config !== 'undefined'
+            ? JSON.parse(__firebase_config)
             : {
                 apiKey: "AIzaSyCmqmGIBfUv_UVJU80AB_iUpE_yLLX-dAw",
                 authDomain: "mistake-notebook-caca8.firebaseapp.com",
@@ -100,11 +94,26 @@
                 appId: "1:298098777699:web:4590aecebc2293bab9e256",
                 measurementId: "G-6S5QWYKT7M"
             };
-        
-        const appId = typeof __app_id !== 'undefined' ? __app_id : "business-card-app";
+
+        const appIdVal = typeof __app_id !== 'undefined' ? __app_id : "business-card-app";
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+
+        window.FirebaseSDK = {
+            auth, db, appId: appIdVal,
+            collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, query,
+            onAuthStateChanged, signInAnonymously, signInWithCustomToken, setPersistence, inMemoryPersistence
+        };
+    </script>
+
+    <script type="module">
+        const html = htm.bind(React.createElement);
+        const { useState, useEffect, useRef, useMemo } = React;
+        const { auth, db, appId, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, query, onAuthStateChanged, signInAnonymously, signInWithCustomToken, setPersistence, inMemoryPersistence } = window.FirebaseSDK;
+
+        // --- 版本號 ---
+        const APP_VERSION = "v2.0.5";
 
         const Icon = ({ name, size = 20, className = "" }) => {
             const containerRef = useRef(null);
@@ -121,7 +130,7 @@
                     }
                 }
             }, [name, size, className]);
-            return <span ref={containerRef} className="inline-flex items-center justify-center shrink-0" />;
+            return html`<span ref=${containerRef} className="inline-flex items-center justify-center shrink-0" />`;
         };
 
         function App() {
@@ -180,11 +189,11 @@
             // 2. 實時資料讀取
             useEffect(() => {
                 if (!user) return;
-                
+
                 addLog("正在連接資料庫...");
                 const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'cards');
-                
-                const unsubscribe = onSnapshot(colRef, 
+
+                const unsubscribe = onSnapshot(colRef,
                     (snapshot) => {
                         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                         setCards(data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
@@ -276,258 +285,258 @@
             };
 
             const filteredCards = useMemo(() => {
-                return cards.filter(c => 
-                    (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                return cards.filter(c =>
+                    (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                     (c.company || '').toLowerCase().includes(searchTerm.toLowerCase())
                 );
             }, [cards, searchTerm]);
 
             if (isConnecting) {
-                return (
+                return html`
                     <div className="flex flex-col items-center justify-center full-h-dynamic bg-white p-6 text-center">
-                        <Icon name="Loader2" className="animate-spin text-indigo-600 mb-4" size={48} />
-                        <p className="text-slate-400 font-bold tracking-widest text-xs uppercase">雲端驗證中... ({APP_VERSION})</p>
+                        <${Icon} name="Loader2" className="animate-spin text-indigo-600 mb-4" size=${48} />
+                        <p className="text-slate-400 font-bold tracking-widest text-xs uppercase">雲端驗證中... (${APP_VERSION})</p>
                         <div className="mt-8 w-full max-w-xs debug-log text-left">
-                            {debugLogs.map((l, i) => <div key={i}>{l}</div>)}
+                            ${debugLogs.map((l, i) => html`<div key=${i}>${l}</div>`)}
                         </div>
                     </div>
-                );
+                `;
             }
 
-            return (
+            return html`
                 <div className="full-h-dynamic flex flex-col max-w-4xl mx-auto bg-slate-50">
-                    {/* Header */}
+                    <!-- Header -->
                     <header className="p-5 pb-2 flex justify-between items-center bg-slate-50/80 backdrop-blur-md sticky top-0 z-30">
                         <div>
                             <div className="flex items-center gap-2">
                                 <h1 className="text-2xl font-black text-slate-800 tracking-tighter">名片管理</h1>
-                                <span className="bg-indigo-100 text-indigo-600 text-[10px] font-bold px-2 py-0.5 rounded-full">{APP_VERSION}</span>
+                                <span className="bg-indigo-100 text-indigo-600 text-[10px] font-bold px-2 py-0.5 rounded-full">${APP_VERSION}</span>
                             </div>
                             <div className="flex items-center gap-1.5 mt-0.5">
                                 <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">已安全連線</span>
                             </div>
                         </div>
-                        <button 
-                            onClick={() => setIsAdding(true)}
+                        <button
+                            onClick=${() => setIsAdding(true)}
                             className="touch-active bg-indigo-600 text-white p-3 rounded-2xl shadow-lg shadow-indigo-200"
                         >
-                            <Icon name="Plus" size={24} />
+                            <${Icon} name="Plus" size=${24} />
                         </button>
                     </header>
 
-                    {/* Search */}
+                    <!-- Search -->
                     <div className="px-5 py-3">
                         <div className="relative">
-                            <Icon name="Search" className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                            <input 
+                            <${Icon} name="Search" className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size=${18} />
+                            <input
                                 type="text"
                                 placeholder="搜尋姓名、公司..."
                                 className="w-full bg-white border-none rounded-2xl py-3.5 pl-12 pr-4 shadow-sm focus:ring-2 focus:ring-indigo-500 transition-all text-base"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                value=${searchTerm}
+                                onChange=${(e) => setSearchTerm(e.target.value)}
                             />
                         </div>
                     </div>
 
-                    {/* Card List */}
+                    <!-- Card List -->
                     <main className="flex-1 overflow-y-auto px-5 pb-10 hide-scrollbar">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {filteredCards.map(card => (
-                                <div key={card.id} className="bg-white rounded-[2rem] p-4 shadow-sm border border-slate-100 relative overflow-hidden">
+                            ${filteredCards.map(card => html`
+                                <div key=${card.id} className="bg-white rounded-[2rem] p-4 shadow-sm border border-slate-100 relative overflow-hidden">
                                     <div className="card-image-container mb-4">
-                                        {card.imageUrl ? (
-                                            <img src={card.imageUrl} alt="Card" />
-                                        ) : (
-                                            <Icon name="Image" size={32} className="text-slate-200" />
-                                        )}
+                                        ${card.imageUrl ? html`
+                                            <img src=${card.imageUrl} alt="Card" />
+                                        ` : html`
+                                            <${Icon} name="Image" size=${32} className="text-slate-200" />
+                                        `}
                                     </div>
                                     <div className="space-y-1">
                                         <div className="flex justify-between items-start">
-                                            <h3 className="font-bold text-lg text-slate-800 truncate">{card.name}</h3>
+                                            <h3 className="font-bold text-lg text-slate-800 truncate">${card.name}</h3>
                                             <div className="flex items-center gap-2">
-                                                <button 
-                                                    onClick={() => setEditTarget(card)}
+                                                <button
+                                                    onClick=${() => setEditTarget(card)}
                                                     className="text-slate-300 hover:text-indigo-500 p-1"
                                                 >
-                                                    <Icon name="Pencil" size={18} />
+                                                    <${Icon} name="Pencil" size=${18} />
                                                 </button>
-                                                <button 
-                                                    onClick={() => setDeleteTarget(card)}
+                                                <button
+                                                    onClick=${() => setDeleteTarget(card)}
                                                     className="text-slate-300 hover:text-red-500 p-1"
                                                 >
-                                                    <Icon name="Trash2" size={18} />
+                                                    <${Icon} name="Trash2" size=${18} />
                                                 </button>
                                             </div>
                                         </div>
-                                        <p className="text-indigo-600 text-xs font-black uppercase tracking-wider">{card.title || '無職稱'}</p>
+                                        <p className="text-indigo-600 text-xs font-black uppercase tracking-wider">${card.title || '無職稱'}</p>
                                         <div className="pt-2 space-y-1.5">
                                             <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-                                                <Icon name="Building" size={14} className="text-slate-400 shrink-0" />
-                                                <span className="truncate">{card.company || '-'}</span>
+                                                <${Icon} name="Building" size=${14} className="text-slate-400 shrink-0" />
+                                                <span className="truncate">${card.company || '-'}</span>
                                             </div>
                                             <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-                                                <Icon name="Phone" size={14} className="text-slate-400 shrink-0" />
-                                                <span>{card.phone || '-'}</span>
+                                                <${Icon} name="Phone" size=${14} className="text-slate-400 shrink-0" />
+                                                <span>${card.phone || '-'}</span>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                            ))}
+                            `)}
                         </div>
-                        
-                        {filteredCards.length === 0 && (
+
+                        ${filteredCards.length === 0 && html`
                             <div className="flex flex-col items-center justify-center py-20 opacity-20">
-                                <Icon name="Inbox" size={64} />
+                                <${Icon} name="Inbox" size=${64} />
                                 <p className="font-bold mt-4">尚無名片資料</p>
                             </div>
-                        )}
+                        `}
                     </main>
 
-                    {/* 新增名片 Modal */}
-                    {isAdding && (
+                    <!-- 新增名片 Modal -->
+                    ${isAdding && html`
                         <div className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center sm:items-center bg-slate-900/60 backdrop-blur-sm">
-                            <div className="absolute inset-0" onClick={() => setIsAdding(false)}></div>
+                            <div className="absolute inset-0" onClick=${() => setIsAdding(false)}></div>
                             <div className="mobile-bottom-sheet bg-white w-full sm:max-w-xl sm:rounded-[2.5rem] max-h-[92dvh] overflow-hidden flex flex-col relative">
                                 <div className="p-6 border-b border-slate-50 flex justify-between items-center shrink-0">
                                     <h2 className="text-xl font-black">新增名片</h2>
-                                    <button onClick={() => setIsAdding(false)} className="p-2 bg-slate-100 rounded-full text-slate-500">
-                                        <Icon name="X" size={20} />
+                                    <button onClick=${() => setIsAdding(false)} className="p-2 bg-slate-100 rounded-full text-slate-500">
+                                        <${Icon} name="X" size=${20} />
                                     </button>
                                 </div>
-                                
+
                                 <div className="flex-1 overflow-y-auto p-6 space-y-6 hide-scrollbar">
                                     <div className="relative card-image-container border-2 border-dashed border-slate-200 bg-slate-50 cursor-pointer overflow-hidden active:bg-slate-100 transition-colors">
-                                        {selectedImage ? (
-                                            <img src={selectedImage} />
-                                        ) : (
+                                        ${selectedImage ? html`
+                                            <img src=${selectedImage} />
+                                        ` : html`
                                             <div className="flex flex-col items-center gap-2 text-slate-400">
-                                                <Icon name="Camera" size={40} />
+                                                <${Icon} name="Camera" size=${40} />
                                                 <p className="text-xs font-bold uppercase tracking-widest">拍名片或選取檔案</p>
                                             </div>
-                                        )}
-                                        <input 
-                                            type="file" 
+                                        `}
+                                        <input
+                                            type="file"
                                             accept="image/*"
                                             className="absolute inset-0 opacity-0 cursor-pointer"
-                                            onChange={handleFileChange}
+                                            onChange=${handleFileChange}
                                         />
-                                        {loading && (
+                                        ${loading && html`
                                             <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
-                                                <Icon name="Loader2" className="animate-spin text-indigo-600" size={32} />
+                                                <${Icon} name="Loader2" className="animate-spin text-indigo-600" size=${32} />
                                             </div>
-                                        )}
+                                        `}
                                     </div>
 
                                     <div className="space-y-4 pb-10">
-                                        {[
+                                        ${[
                                             { label: '姓名 (必填)', key: 'name' },
                                             { label: '職稱', key: 'title' },
                                             { label: '公司', key: 'company' },
                                             { label: '電話', key: 'phone' },
                                             { label: 'Email', key: 'email' }
-                                        ].map(field => (
-                                            <div key={field.key}>
+                                        ].map(field => html`
+                                            <div key=${field.key}>
                                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">
-                                                    {field.label}
+                                                    ${field.label}
                                                 </label>
-                                                <input 
+                                                <input
                                                     type="text"
-                                                    value={newCard[field.key]}
-                                                    onChange={e => setNewCard({...newCard, [field.key]: e.target.value})}
+                                                    value=${newCard[field.key]}
+                                                    onChange=${e => setNewCard({...newCard, [field.key]: e.target.value})}
                                                     className="w-full bg-slate-50 border-none rounded-2xl p-4 text-base font-bold focus:ring-2 focus:ring-indigo-500 transition-all shadow-inner"
-                                                    placeholder={`輸入${field.label.split(' ')[0]}`}
+                                                    placeholder=${'輸入' + field.label.split(' ')[0]}
                                                 />
                                             </div>
-                                        ))}
+                                        `)}
                                     </div>
                                 </div>
 
                                 <div className="p-6 pt-2 border-t border-slate-50 shrink-0 mb-safe">
-                                    <button 
-                                        disabled={!newCard.name || loading}
-                                        onClick={saveCard}
+                                    <button
+                                        disabled=${!newCard.name || loading}
+                                        onClick=${saveCard}
                                         className="touch-active w-full bg-indigo-600 text-white py-4 rounded-[1.5rem] font-black shadow-xl shadow-indigo-100 disabled:opacity-30 disabled:shadow-none flex items-center justify-center gap-2"
                                     >
-                                        {loading ? <Icon name="Loader2" className="animate-spin" size={20} /> : <Icon name="CheckCircle" size={20} />}
+                                        ${loading ? html`<${Icon} name="Loader2" className="animate-spin" size=${20} />` : html`<${Icon} name="CheckCircle" size=${20} />`}
                                         確認儲存
                                     </button>
                                 </div>
                             </div>
                         </div>
-                    )}
+                    `}
 
-                    {/* 修改名片 Modal */}
-                    {editTarget && (
+                    <!-- 修改名片 Modal -->
+                    ${editTarget && html`
                         <div className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center sm:items-center bg-slate-900/60 backdrop-blur-sm">
-                            <div className="absolute inset-0" onClick={() => setEditTarget(null)}></div>
+                            <div className="absolute inset-0" onClick=${() => setEditTarget(null)}></div>
                             <div className="mobile-bottom-sheet bg-white w-full sm:max-w-xl sm:rounded-[2.5rem] max-h-[92dvh] overflow-hidden flex flex-col relative shadow-2xl">
                                 <div className="p-6 border-b border-slate-50 flex justify-between items-center shrink-0">
                                     <h2 className="text-xl font-black">修改資訊</h2>
-                                    <button onClick={() => setEditTarget(null)} className="p-2 bg-slate-100 rounded-full text-slate-500">
-                                        <Icon name="X" size={20} />
+                                    <button onClick=${() => setEditTarget(null)} className="p-2 bg-slate-100 rounded-full text-slate-500">
+                                        <${Icon} name="X" size=${20} />
                                     </button>
                                 </div>
-                                
+
                                 <div className="flex-1 overflow-y-auto p-6 space-y-6 hide-scrollbar">
-                                    {/* 預覽目前的圖片 (不支援修改圖片以保持穩定性) */}
+                                    <!-- 預覽目前的圖片 (不支援修改圖片以保持穩定性) -->
                                     <div className="card-image-container border-2 border-slate-100 bg-slate-50 grayscale-[0.5] opacity-80">
-                                        {editTarget.imageUrl ? (
-                                            <img src={editTarget.imageUrl} alt="Current Card" />
-                                        ) : (
-                                            <Icon name="Image" size={32} className="text-slate-200" />
-                                        )}
+                                        ${editTarget.imageUrl ? html`
+                                            <img src=${editTarget.imageUrl} alt="Current Card" />
+                                        ` : html`
+                                            <${Icon} name="Image" size=${32} className="text-slate-200" />
+                                        `}
                                     </div>
 
                                     <div className="space-y-4 pb-10">
-                                        {[
+                                        ${[
                                             { label: '姓名 (必填)', key: 'name' },
                                             { label: '職稱', key: 'title' },
                                             { label: '公司', key: 'company' },
                                             { label: '電話', key: 'phone' },
                                             { label: 'Email', key: 'email' }
-                                        ].map(field => (
-                                            <div key={field.key}>
+                                        ].map(field => html`
+                                            <div key=${field.key}>
                                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-1 block">
-                                                    {field.label}
+                                                    ${field.label}
                                                 </label>
-                                                <input 
+                                                <input
                                                     type="text"
-                                                    value={editTarget[field.key] || ''}
-                                                    onChange={e => setEditTarget({...editTarget, [field.key]: e.target.value})}
+                                                    value=${editTarget[field.key] || ''}
+                                                    onChange=${e => setEditTarget({...editTarget, [field.key]: e.target.value})}
                                                     className="w-full bg-slate-50 border-none rounded-2xl p-4 text-base font-bold focus:ring-2 focus:ring-indigo-500 transition-all shadow-inner"
                                                 />
                                             </div>
-                                        ))}
+                                        `)}
                                     </div>
                                 </div>
 
                                 <div className="p-6 pt-2 border-t border-slate-50 shrink-0 mb-safe">
-                                    <button 
-                                        disabled={!editTarget.name || loading}
-                                        onClick={handleUpdateCard}
+                                    <button
+                                        disabled=${!editTarget.name || loading}
+                                        onClick=${handleUpdateCard}
                                         className="touch-active w-full bg-indigo-600 text-white py-4 rounded-[1.5rem] font-black shadow-xl shadow-indigo-100 disabled:opacity-30 disabled:shadow-none flex items-center justify-center gap-2"
                                     >
-                                        {loading ? <Icon name="Loader2" className="animate-spin" size={20} /> : <Icon name="Save" size={20} />}
+                                        ${loading ? html`<${Icon} name="Loader2" className="animate-spin" size=${20} />` : html`<${Icon} name="Save" size=${20} />`}
                                         儲存修改
                                     </button>
                                 </div>
                             </div>
                         </div>
-                    )}
+                    `}
 
-                    {/* 刪除確認 Modal */}
-                    {deleteTarget && (
+                    <!-- 刪除確認 Modal -->
+                    ${deleteTarget && html`
                         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
                             <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-xs text-center shadow-2xl">
                                 <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <Icon name="Trash2" size={32} />
+                                    <${Icon} name="Trash2" size=${32} />
                                 </div>
                                 <h3 className="text-xl font-black mb-2">確定刪除？</h3>
-                                <p className="text-sm text-slate-500 mb-8 leading-relaxed">「{deleteTarget.name}」的資料將從雲端庫移除。</p>
+                                <p className="text-sm text-slate-500 mb-8 leading-relaxed">「${deleteTarget.name}」的資料將從雲端庫移除。</p>
                                 <div className="space-y-3">
-                                    <button 
-                                        onClick={async () => {
+                                    <button
+                                        onClick=${async () => {
                                             try {
                                                 const cardDoc = doc(db, 'artifacts', appId, 'public', 'data', 'cards', deleteTarget.id);
                                                 await deleteDoc(cardDoc);
@@ -540,17 +549,17 @@
                                     >
                                         確定刪除
                                     </button>
-                                    <button onClick={() => setDeleteTarget(null)} className="w-full text-slate-400 font-bold py-2 hover:text-slate-600 transition-colors">取消</button>
+                                    <button onClick=${() => setDeleteTarget(null)} className="w-full text-slate-400 font-bold py-2 hover:text-slate-600 transition-colors">取消</button>
                                 </div>
                             </div>
                         </div>
-                    )}
+                    `}
                 </div>
-            );
+            `;
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        root.render(html`<${App} />`);
     </script>
 </body>
 </html>
